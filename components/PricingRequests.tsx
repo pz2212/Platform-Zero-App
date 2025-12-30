@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { User, Product, UserRole, SupplierPriceRequest, SupplierPriceRequestItem, Customer } from '../types';
-import { mockService } from '../services/mockDataService';
+import { User, Product, UserRole, SupplierPriceRequest, SupplierPriceRequestItem, Customer, BusinessCategory } from '../types';
+import { mockService, SegmentConfig } from '../services/mockDataService';
 import { extractInvoiceItems } from '../services/geminiService';
 import { 
   Calculator, Download, Mail, Building, TrendingDown, 
   FileText, Upload, X, Loader2, Eye, EyeOff, Send, CheckCircle, MapPin, Handshake, ChevronRight, UserPlus, DollarSign, Clock,
-  Store, ChevronDown, Info, Check, MessageSquare, Rocket, FilePlus
+  Store, ChevronDown, Info, Check, MessageSquare, Rocket, FilePlus, Sparkles, Settings, Save, ArrowDown
 } from 'lucide-react';
 
 interface PricingRequestsProps {
@@ -25,11 +25,22 @@ interface ComparisonItem {
 export const PricingRequests: React.FC<PricingRequestsProps> = ({ user }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const state = location.state as { customerName?: string, customerLocation?: string, invoiceFile?: string, weeklySpend?: number, orderFreq?: string } || {};
+  const state = location.state as { 
+      customerName?: string, 
+      customerLocation?: string, 
+      invoiceFile?: string, 
+      weeklySpend?: number, 
+      orderFreq?: string,
+      businessCategory?: BusinessCategory
+  } || {};
+
+  // Segment Settings Management (Linked to Global Config)
+  const [segmentConfigs] = useState<Record<BusinessCategory, SegmentConfig>>(mockService.getMarketSegmentConfigs());
 
   // Configuration State
   const [customerName, setCustomerName] = useState(state.customerName || '');
   const [customerLocation, setCustomerLocation] = useState(state.customerLocation || '');
+  const [businessCategory, setBusinessCategory] = useState<BusinessCategory>(state.businessCategory || 'Restaurant');
   const [invoiceFile, setInvoiceFile] = useState<File | string | null>(state.invoiceFile || null);
   const [invoiceFileName, setInvoiceFileName] = useState<string>(state.invoiceFile ? 'Attached from Lead Record' : '');
   
@@ -37,9 +48,9 @@ export const PricingRequests: React.FC<PricingRequestsProps> = ({ user }) => {
   const [weeklySpend, setWeeklySpend] = useState<number | string>(state.weeklySpend || '');
   const [orderFreq, setOrderFreq] = useState<string>(state.orderFreq || 'Weekly');
 
-  // Settings
-  const [targetSavings, setTargetSavings] = useState<number>(30); 
-  const [supplierTarget, setSupplierTarget] = useState<number>(35); 
+  // Settings (Automatic based on dynamic configs, but overridable locally)
+  const [targetSavings, setTargetSavings] = useState<number>(0); 
+  const [supplierTarget, setSupplierTarget] = useState<number>(0); 
   const [showSupplierTargets, setShowSupplierTargets] = useState(false);
 
   // Data State
@@ -64,6 +75,11 @@ export const PricingRequests: React.FC<PricingRequestsProps> = ({ user }) => {
     setProducts(mockService.getAllProducts());
     setWholesalers(mockService.getWholesalers());
 
+    // Initialize targets based on initial category with safety fallback
+    const config = segmentConfigs[businessCategory] || segmentConfigs['Restaurant'];
+    setTargetSavings(config.targetSavings);
+    setSupplierTarget(config.supplierTarget);
+
     if (state.invoiceFile && !isGenerated && !isProcessing) {
         handleGenerate();
     }
@@ -78,6 +94,14 @@ export const PricingRequests: React.FC<PricingRequestsProps> = ({ user }) => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const handleCategoryChange = (cat: BusinessCategory) => {
+      setBusinessCategory(cat);
+      const config = segmentConfigs[cat] || segmentConfigs['Restaurant'];
+      setTargetSavings(config.targetSavings);
+      setSupplierTarget(config.supplierTarget);
+      if (isGenerated) setIsGenerated(false); 
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -225,10 +249,6 @@ export const PricingRequests: React.FC<PricingRequestsProps> = ({ user }) => {
   const totalSavingsValue = totalInvoiceSpend - totalPzSpend;
   const actualSavingsPercent = totalInvoiceSpend > 0 ? (totalSavingsValue / totalInvoiceSpend) * 100 : 0;
 
-  const handleExportPDF = () => {
-      alert("PDF Exported!");
-  };
-
   const handleOpenSupplierModal = () => {
       setIsSupplierModalOpen(true);
   };
@@ -278,13 +298,14 @@ export const PricingRequests: React.FC<PricingRequestsProps> = ({ user }) => {
             </h1>
             <p className="text-gray-500 mt-1 font-medium">Extract invoice items and generate competitive platform quotes.</p>
         </div>
-        {isGenerated && (
-             <div className="flex gap-2">
-                <span className="bg-emerald-50 text-emerald-700 px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest flex items-center gap-2 border border-emerald-100 shadow-sm">
-                    <CheckCircle size={14}/> {comparison.length} Items Analysed
-                </span>
-             </div>
-        )}
+        <div className="flex gap-2">
+            <button 
+                onClick={() => navigate('/customer-portals')}
+                className="px-6 py-2.5 rounded-xl font-black uppercase tracking-widest text-[10px] flex items-center gap-2 border-2 bg-white text-indigo-600 border-indigo-100 hover:bg-indigo-50 transition-all shadow-sm"
+            >
+                <Settings size={14}/> Manage Global Logic
+            </button>
+        </div>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-8">
@@ -293,9 +314,14 @@ export const PricingRequests: React.FC<PricingRequestsProps> = ({ user }) => {
         <div className="w-full lg:w-1/3 space-y-6">
             
             <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 p-8">
-                <h2 className="font-black text-gray-900 mb-8 flex items-center gap-2 text-xl uppercase tracking-tight">
-                    Lead Config
-                </h2>
+                <div className="flex justify-between items-center mb-8">
+                    <h2 className="font-black text-gray-900 flex items-center gap-2 text-xl uppercase tracking-tight">
+                        Lead Config
+                    </h2>
+                    <div className="flex items-center gap-1 text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full text-[10px] font-black uppercase">
+                        <Sparkles size={12}/> Global Logic
+                    </div>
+                </div>
                 
                 <div className="space-y-6">
                     <div>
@@ -310,6 +336,26 @@ export const PricingRequests: React.FC<PricingRequestsProps> = ({ user }) => {
                                 className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-200 rounded-2xl text-sm font-black text-gray-900 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all"
                             />
                         </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Market Segment (Automatic Targets)</label>
+                        <div className="relative">
+                            <Store size={18} className="absolute left-4 top-4 text-gray-400 pointer-events-none"/>
+                            <select 
+                                value={businessCategory}
+                                onChange={(e) => handleCategoryChange(e.target.value as BusinessCategory)}
+                                className="w-full pl-12 pr-10 py-4 bg-white border-2 border-indigo-100 rounded-2xl text-sm font-black text-indigo-700 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all appearance-none shadow-sm"
+                            >
+                                {Object.keys(segmentConfigs).map(cat => (
+                                    <option key={cat} value={cat}>{cat}</option>
+                                ))}
+                            </select>
+                            <ChevronDown className="absolute right-4 top-4.5 text-indigo-300" size={18}/>
+                        </div>
+                        <p className="text-[9px] text-indigo-400 font-bold uppercase mt-2 ml-1">
+                            Setting savings target to {targetSavings}% based on your {businessCategory} configuration.
+                        </p>
                     </div>
 
                     <div>
@@ -411,7 +457,7 @@ export const PricingRequests: React.FC<PricingRequestsProps> = ({ user }) => {
 
                     <div className="grid grid-cols-2 gap-6 pt-6 border-t border-gray-100">
                         <div>
-                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">PZ Savings (%)</label>
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Override Savings (%)</label>
                             <div className="relative">
                                 <span className="absolute left-4 top-3.5 text-gray-400 text-xs font-black">%</span>
                                 <input 
@@ -423,7 +469,7 @@ export const PricingRequests: React.FC<PricingRequestsProps> = ({ user }) => {
                             </div>
                         </div>
                         <div>
-                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Supplier Goal (%)</label>
+                            <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Supplier Target (%)</label>
                             <div className="relative">
                                 <span className="absolute left-4 top-3.5 text-gray-400 text-xs font-black">%</span>
                                 <input 
@@ -439,9 +485,9 @@ export const PricingRequests: React.FC<PricingRequestsProps> = ({ user }) => {
                     <button 
                         onClick={handleGenerate}
                         disabled={isProcessing}
-                        className={`w-full py-5 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-xl flex items-center justify-center gap-3 transition-all mt-4 ${isProcessing ? 'bg-indigo-400 cursor-not-allowed shadow-none' : 'bg-secondary hover:bg-black hover:scale-[1.02] active:scale-95'}`}
+                        className={`w-full py-5 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-xl flex items-center justify-center gap-3 transition-all mt-4 ${isProcessing ? 'bg-indigo-400 cursor-not-allowed shadow-none' : 'bg-[#0F172A] hover:bg-black hover:scale-[1.02] active:scale-95'}`}
                     >
-                        {isProcessing ? <><Loader2 size={24} className="animate-spin"/> Scanning Invoice...</> : <><Calculator size={20}/> Start Analysis</>}
+                        {isProcessing ? <><Loader2 size={24} className="animate-spin"/> Scanning Invoice...</> : <><Calculator size={20}/> Analyse for {businessCategory}</>}
                     </button>
                 </div>
             </div>
@@ -495,18 +541,17 @@ export const PricingRequests: React.FC<PricingRequestsProps> = ({ user }) => {
                              <h2 className="text-3xl font-black text-gray-900 tracking-tight uppercase">{customerName || 'New Comparison Lead'}</h2>
                         </div>
                         <div className="flex flex-wrap items-center gap-3">
-                            <span className="bg-white border border-gray-200 text-gray-400 px-4 py-1.5 rounded-2xl text-[10px] font-black uppercase tracking-widest">{targetSavings}% Baseline Savings</span>
+                            <span className="bg-indigo-600 text-white px-4 py-1.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-sm">{businessCategory}</span>
+                            <span className="bg-white border border-gray-200 text-gray-400 px-4 py-1.5 rounded-2xl text-[10px] font-black uppercase tracking-widest">{targetSavings}% Segment Target</span>
                             {weeklySpend && (
                                 <span className="bg-emerald-100 text-emerald-700 px-4 py-1.5 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border border-emerald-200 shadow-inner-sm">
                                     <DollarSign size={14}/> Weekly Volume: ${weeklySpend}
                                 </span>
                             )}
-                            <span className="text-gray-200 mx-2">|</span>
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">AI Market Matched</span>
                         </div>
                     </div>
                     <div className="flex gap-2">
-                        <button onClick={handleExportPDF} className="p-4 bg-white border border-gray-200 text-gray-400 rounded-2xl hover:text-indigo-600 hover:border-indigo-200 transition-all shadow-sm">
+                        <button className="p-4 bg-white border border-gray-200 text-gray-400 rounded-2xl hover:text-indigo-600 hover:border-indigo-200 transition-all shadow-sm">
                             <Download size={24}/>
                         </button>
                         <button className="flex items-center gap-3 px-8 py-4 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest rounded-[1.5rem] hover:bg-indigo-700 shadow-xl transition-all active:scale-95">
@@ -525,7 +570,7 @@ export const PricingRequests: React.FC<PricingRequestsProps> = ({ user }) => {
                                     <th className="px-6 py-4 text-right">Invoiced Price</th>
                                     <th className="px-6 py-4 text-right text-emerald-600">PZ Rate</th>
                                     {showSupplierTargets && (
-                                        <th className="px-6 py-4 text-right text-blue-600 bg-blue-50/50 rounded-t-2xl">Target Rate ({supplierTarget}%)</th>
+                                        <th className="px-6 py-4 text-right text-blue-600 bg-blue-50/50 rounded-t-2xl">Supplier Target ({supplierTarget}%)</th>
                                     )}
                                     <th className="px-6 py-4 text-right">Variance</th>
                                 </tr>
@@ -553,7 +598,7 @@ export const PricingRequests: React.FC<PricingRequestsProps> = ({ user }) => {
                                             </td>
                                         )}
                                         <td className="px-6 py-6 bg-white border-y border-r border-gray-100 rounded-r-3xl text-right group-hover:bg-gray-50/50">
-                                            <span className="bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border border-emerald-200 shadow-sm">
+                                            <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-xl text-[10px] font-black uppercase tracking-widest border border-emerald-200 shadow-sm">
                                                 -{item.savingsPercent}%
                                             </span>
                                         </td>
@@ -568,7 +613,7 @@ export const PricingRequests: React.FC<PricingRequestsProps> = ({ user }) => {
                             </div>
                             <div className="text-center">
                                 <p className="text-2xl font-black text-gray-900 tracking-tight uppercase">Waiting for Data</p>
-                                <p className="text-gray-500 mt-2 font-medium max-w-sm">Upload a competitor invoice and configure the savings target to generate a comparison.</p>
+                                <p className="text-gray-500 mt-2 font-medium max-w-sm">Upload a competitor invoice and select a market segment to generate an automated comparison.</p>
                             </div>
                         </div>
                     )}
@@ -585,7 +630,7 @@ export const PricingRequests: React.FC<PricingRequestsProps> = ({ user }) => {
                         }`}
                     >
                         {showSupplierTargets ? <EyeOff size={18}/> : <Eye size={18}/>} 
-                        {showSupplierTargets ? 'Hide Wholesaler Strategy' : 'Review Procurement Target'}
+                        {showSupplierTargets ? 'Hide Procurement Targets' : 'Review Procurement Targets'}
                     </button>
                     
                     {isGenerated && showSupplierTargets && (

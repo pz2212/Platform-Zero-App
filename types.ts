@@ -93,6 +93,7 @@ export interface RegistrationRequest {
     location: string;
     weeklySpend: number;
     orderFrequency: string;
+    businessCategory?: BusinessCategory;
     abn?: string;
     deliveryAddress?: string;
     deliveryInstructions?: string;
@@ -215,7 +216,7 @@ export interface LogisticsDetails {
 
 export type ConsumerConnectionStatus = 'Active' | 'Pending Connection' | 'Pricing Pending' | 'Pending PZ Approval' | 'Not Connected';
 
-export type BusinessCategory = 'Cafe' | 'Restaurant' | 'Pub' | 'Food Manufacturer' | 'Retail';
+export type BusinessCategory = 'Deli' | 'Cafe' | 'Restaurant' | 'Pub' | 'Sporting club' | 'Catering' | 'Grocery store';
 
 export interface Customer {
   id: string;

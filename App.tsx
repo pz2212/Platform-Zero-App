@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { HashRouter as Router, Routes, Route, Link, useLocation, Navigate, useNavigate } from 'react-router-dom';
 import { UserRole, User, AppNotification } from './types';
@@ -28,6 +27,7 @@ import { AdminRepManagement } from './components/AdminRepManagement';
 import { TradingInsights } from './components/TradingInsights';
 import { AdminSuppliers } from './components/AdminSuppliers';
 import { Contacts } from './components/Contacts';
+import { Blueprint } from './components/Blueprint';
 import { 
   LayoutDashboard, 
   Package, 
@@ -35,43 +35,37 @@ import {
   Users, 
   Settings, 
   LogOut,
-  Menu,
-  Tags,
   ChevronDown,
   ChevronRight,
   UserPlus,
-  ClipboardList, 
-  ScanLine, 
   DollarSign, 
   Store, 
   X, 
   Lock, 
   ArrowLeft, 
   Briefcase, 
-  Eye, 
-  EyeOff, 
   Bell, 
   Award,
   ShoppingBag,
   Sprout,
   Handshake,
-  ShieldCheck,
   TrendingUp,
   Target,
   Plus,
   ChevronUp,
   BarChart4,
   Layers,
-  FileText,
   Gift,
   Truck,
   Sparkles,
   Calculator,
-  Clock,
   Building,
   User as UserIcon,
   MessageCircle,
-  Menu as HamburgerIcon
+  Menu as HamburgerIcon,
+  Tag,
+  FileText,
+  BookOpen
 } from 'lucide-react';
 
 const SidebarLink = ({ to, icon: Icon, label, active, onClick, isSubItem = false, badge = 0, subLabel }: any) => (
@@ -86,13 +80,13 @@ const SidebarLink = ({ to, icon: Icon, label, active, onClick, isSubItem = false
   >
     <div className="flex items-center space-x-3 min-w-0">
         <Icon size={isSubItem ? 16 : 20} className={active ? 'text-emerald-600' : 'text-gray-400 group-hover:text-emerald-500 transition-colors'} />
-        <div className="truncate">
+        <div className="min-w-0 flex-1">
           <span className="block truncate">{label}</span>
-          {subLabel && <span className="block text-[9px] font-black text-gray-400 uppercase tracking-tighter">{subLabel}</span>}
+          {subLabel && <span className="block text-[9px] font-black text-gray-400 uppercase tracking-tighter truncate">{subLabel}</span>}
         </div>
     </div>
     {badge > 0 && (
-        <span className="bg-red-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center animate-pulse shrink-0">
+        <span className="bg-red-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center animate-pulse shrink-0 ml-2">
             {badge}
         </span>
     )}
@@ -309,126 +303,34 @@ const NetworkSignalsWidget = ({ user, mode = 'sidebar', onFinish }: { user: User
   );
 };
 
-const AppLayout = ({ children, user, onLogout }: any) => {
-  const location = useLocation();
-  const queryParams = new URLSearchParams(location.search);
-  const isActive = (path: string) => location.pathname === path;
-  const isChatActive = (id: string) => location.pathname === '/contacts' && queryParams.get('id') === id;
-  
-  const [showDailyPopup, setShowDailyPopup] = useState(false);
-  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
-  const [isMarketplaceMenuOpen, setIsMarketplaceMenuOpen] = useState(true);
-  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
-  const [notifCount, setNotifCount] = useState(0);
-  const [directory, setDirectory] = useState<User[]>([]);
-
-  const notifRef = useRef<HTMLDivElement>(null);
-  const mobileNavRef = useRef<HTMLDivElement>(null);
-
-  // Quote Notification Count (Admin)
-  const submittedQuotesCount = mockService.getAllSupplierPriceRequests().filter(r => r.status === 'SUBMITTED').length;
-
-  useEffect(() => {
-    if (user.role === UserRole.WHOLESALER || user.role === UserRole.FARMER) {
-        const today = new Date().toLocaleDateString();
-        const lastSeen = localStorage.getItem(`pz_daily_signal_${user.id}`);
-        if (lastSeen !== today) {
-            setShowDailyPopup(true);
-        }
-    }
-    // Fetch contacts for sidebar
-    setDirectory(mockService.getWholesalers().filter(u => u.id !== user.id));
-  }, [user]);
-
-  useEffect(() => {
-    const updateNotifs = () => {
-        const notifs = mockService.getAppNotifications(user.id);
-        setNotifCount(notifs.filter(n => !n.isRead).length);
-    };
-    updateNotifs();
-    const interval = setInterval(updateNotifs, 5000);
-    return () => clearInterval(interval);
-  }, [user.id]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
-        setShowNotifDropdown(false);
-      }
-      if (mobileNavRef.current && !mobileNavRef.current.contains(event.target as Node)) {
-        setIsMobileNavOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const handleClosePopup = () => {
-      const today = new Date().toLocaleDateString();
-      localStorage.setItem(`pz_daily_signal_${user.id}`, today);
-      setShowDailyPopup(false);
-  };
-
+const NavItems = ({ user, isActive, setIsMobileNavOpen, isMarketplaceMenuOpen, setIsMarketplaceMenuOpen, submittedQuotesCount, directory, isChatActive, onLogout }: any) => {
   const isPartner = user.role === UserRole.WHOLESALER || user.role === UserRole.FARMER;
-
-  const NavItems = () => (
+  return (
     <div className="flex-1 py-4 px-3 space-y-1 flex flex-col no-scrollbar">
           <div className="flex-1 space-y-1">
               {user.role === UserRole.ADMIN ? (
                   <>
                     <div className="pb-2 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Platform Admin</div>
                     <SidebarLink to="/" icon={LayoutDashboard} label="Overview" active={isActive('/')} onClick={() => setIsMobileNavOpen(false)} />
-                    
-                    {/* Elevated Quote Generator for better accessibility */}
-                    <SidebarLink 
-                        to="/pricing-requests" 
-                        icon={Calculator} 
-                        label="Quote Generator" 
-                        active={isActive('/pricing-requests')} 
-                        onClick={() => setIsMobileNavOpen(false)} 
-                    />
-
+                    <SidebarLink to="/pricing-requests" icon={Calculator} label="Quote Generator" active={isActive('/pricing-requests')} onClick={() => setIsMobileNavOpen(false)} />
                     <div className="space-y-1">
-                        <button 
-                            onClick={() => setIsMarketplaceMenuOpen(!isMarketplaceMenuOpen)}
-                            className={`w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors text-gray-600 hover:bg-gray-50 ${isMarketplaceMenuOpen ? 'bg-gray-50/50' : ''}`}
-                        >
-                            <div className="flex items-center gap-3">
-                                <Handshake size={20} className="text-gray-400" />
-                                <span className="font-medium">Admin Console</span>
-                            </div>
+                        <button onClick={() => setIsMarketplaceMenuOpen(!isMarketplaceMenuOpen)} className={`w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors text-gray-600 hover:bg-gray-50 ${isMarketplaceMenuOpen ? 'bg-gray-50/50' : ''}`}>
+                            <div className="flex items-center gap-3"><Handshake size={20} className="text-gray-400" /><span className="font-medium">Admin Console</span></div>
                             <ChevronDown size={16} className={`transition-transform duration-200 ${isMarketplaceMenuOpen ? 'rotate-180' : ''}`} />
                         </button>
-                        
                         {isMarketplaceMenuOpen && (
                             <div className="space-y-1 animate-in slide-in-from-top-2 duration-200">
                                 <SidebarLink to="/marketplace" icon={Layers} label="Catalog Manager" active={isActive('/marketplace')} isSubItem onClick={() => setIsMobileNavOpen(false)} />
                                 <SidebarLink to="/consumer-onboarding" icon={Users} label="Customers" active={isActive('/consumer-onboarding')} isSubItem onClick={() => setIsMobileNavOpen(false)} />
                                 <SidebarLink to="/admin/suppliers" icon={Store} label="Suppliers" active={isActive('/admin/suppliers')} isSubItem onClick={() => setIsMobileNavOpen(false)} />
-                                <SidebarLink 
-                                    to="/login-requests" 
-                                    icon={UserPlus} 
-                                    label="Lead Requests" 
-                                    active={isActive('/login-requests')} 
-                                    isSubItem 
-                                    badge={mockService.getRegistrationRequests().filter(r => r.status === 'Pending').length}
-                                    onClick={() => setIsMobileNavOpen(false)}
-                                />
-                                <SidebarLink 
-                                    to="/admin/negotiations" 
-                                    icon={Tags} 
-                                    label="Price Requests" 
-                                    active={isActive('/admin/negotiations')} 
-                                    isSubItem 
-                                    badge={submittedQuotesCount}
-                                    onClick={() => setIsMobileNavOpen(false)}
-                                />
+                                <SidebarLink to="/login-requests" icon={UserPlus} label="Lead Requests" active={isActive('/login-requests')} isSubItem badge={mockService.getRegistrationRequests().filter(r => r.status === 'Pending').length} onClick={() => setIsMobileNavOpen(false)} />
+                                <SidebarLink to="/admin/negotiations" icon={Tag} label="Price Requests" active={isActive('/admin/negotiations')} isSubItem badge={submittedQuotesCount} onClick={() => setIsMobileNavOpen(false)} />
                             </div>
                         )}
                     </div>
-
                     <SidebarLink to="/customer-portals" icon={Gift} label="Growth & Portals" active={isActive('/customer-portals')} onClick={() => setIsMobileNavOpen(false)} />
                     <SidebarLink to="/admin-reps" icon={Award} label="Rep Management" active={isActive('/admin-reps')} onClick={() => setIsMobileNavOpen(false)} />
+                    <SidebarLink to="/blueprint" icon={FileText} label="Platform Blueprint" active={isActive('/blueprint')} onClick={() => setIsMobileNavOpen(false)} />
                   </>
               ) : user.role === UserRole.CONSUMER ? (
                 <>
@@ -441,29 +343,16 @@ const AppLayout = ({ children, user, onLogout }: any) => {
                 <>
                   <div className="pb-2 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">{user.role === UserRole.FARMER ? 'Farmer Operations' : 'Wholesaler Ops'}</div>
                   <SidebarLink to="/" icon={LayoutDashboard} label="Order Management" active={isActive('/')} badge={mockService.getOrders(user.id).filter(o => o.sellerId === user.id && o.status === 'Pending').length} onClick={() => setIsMobileNavOpen(false)} />
-                  <SidebarLink to="/pricing" icon={Tags} label="Inventory & Price" active={isActive('/pricing')} onClick={() => setIsMobileNavOpen(false)} />
+                  <SidebarLink to="/pricing" icon={Tag} label="Inventory & Price" active={isActive('/pricing')} onClick={() => setIsMobileNavOpen(false)} />
                   <SidebarLink to="/accounts" icon={DollarSign} label="Financials" active={isActive('/accounts')} onClick={() => setIsMobileNavOpen(false)} />
                   <SidebarLink to="/trading-insights" icon={BarChart4} label="Market Intelligence" active={isActive('/trading-insights')} onClick={() => setIsMobileNavOpen(false)} />
-                  
                   <div className="pt-4 pb-2 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Network</div>
                   <SidebarLink to="/market" icon={Store} label="Supplier Market" active={isActive('/market')} onClick={() => setIsMobileNavOpen(false)} />
-                  
+                  <SidebarLink to="/blueprint" icon={BookOpen} label="Docs & Blueprint" active={isActive('/blueprint')} onClick={() => setIsMobileNavOpen(false)} />
                   <div className="pt-8 pb-3 px-4 text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">Contacts</div>
-                  <SidebarLink to="/contacts" icon={Users} label="Directory" active={isActive('/contacts') && !queryParams.get('id')} onClick={() => setIsMobileNavOpen(false)} />
-                  {directory.map(s => (
-                    <SidebarLink 
-                      key={s.id} 
-                      to={`/contacts?id=${s.id}`} 
-                      icon={() => (
-                        <div className="w-5 h-5 rounded-full border-2 border-gray-300 flex items-center justify-center group-hover:border-emerald-500 transition-colors">
-                           <div className="w-1.5 h-1.5 rounded-full bg-gray-300 group-hover:bg-emerald-500 transition-colors"></div>
-                        </div>
-                      )}
-                      label={s.businessName} 
-                      subLabel={s.role === UserRole.FARMER ? 'Farmer' : 'Wholesaler'}
-                      active={isChatActive(s.id)} 
-                      onClick={() => setIsMobileNavOpen(false)}
-                    />
+                  <SidebarLink to="/contacts" icon={Users} label="Directory" active={isActive('/contacts') && !isActive('/contacts')} onClick={() => setIsMobileNavOpen(false)} />
+                  {directory.map((s: User) => (
+                    <SidebarLink key={s.id} to={`/contacts?id=${s.id}`} icon={() => (<div className="w-5 h-5 rounded-full border-2 border-gray-300 flex items-center justify-center group-hover:border-emerald-500 transition-colors"><div className="w-1.5 h-1.5 rounded-full bg-gray-300 group-hover:bg-emerald-500 transition-colors"></div></div>)} label={s.businessName} subLabel={s.role === UserRole.FARMER ? 'Farmer' : 'Wholesaler'} active={isChatActive(s.id)} onClick={() => setIsMobileNavOpen(false)} />
                   ))}
                 </>
               ) : user.role === UserRole.DRIVER ? (
@@ -480,32 +369,76 @@ const AppLayout = ({ children, user, onLogout }: any) => {
                 <SidebarLink to="/settings" icon={Settings} label="Settings" active={isActive('/settings')} onClick={() => setIsMobileNavOpen(false)} />
               </div>
           </div>
-
-          {isPartner && !showDailyPopup && <NetworkSignalsWidget user={user} mode="sidebar" />}
-          
+          {isPartner && <NetworkSignalsWidget user={user} mode="sidebar" />}
           <div className="p-4 mt-4 border-t border-gray-100 md:hidden">
              <button onClick={onLogout} className="w-full flex items-center gap-2 px-2 py-2 text-red-600 font-bold text-sm"><LogOut size={18} /><span>Sign Out</span></button>
           </div>
     </div>
   );
+};
+
+const AppLayout = ({ children, user, onLogout }: any) => {
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const isActive = (path: string) => location.pathname === path;
+  const isChatActive = (id: string) => location.pathname === '/contacts' && queryParams.get('id') === id;
+  
+  const [showDailyPopup, setShowDailyPopup] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [isMarketplaceMenuOpen, setIsMarketplaceMenuOpen] = useState(true);
+  const [showNotifDropdown, setShowNotifDropdown] = useState(false);
+  const [notifCount, setNotifCount] = useState(0);
+  const [directory, setDirectory] = useState<User[]>([]);
+
+  const notifRef = useRef<HTMLDivElement>(null);
+  const mobileNavRef = useRef<HTMLDivElement>(null);
+  const submittedQuotesCount = mockService.getAllSupplierPriceRequests().filter(r => r.status === 'SUBMITTED').length;
+
+  useEffect(() => {
+    if (user.role === UserRole.WHOLESALER || user.role === UserRole.FARMER) {
+        const today = new Date().toLocaleDateString();
+        const lastSeen = localStorage.getItem(`pz_daily_signal_${user.id}`);
+        if (lastSeen !== today) setShowDailyPopup(true);
+    }
+    setDirectory(mockService.getWholesalers().filter(u => u.id !== user.id));
+  }, [user]);
+
+  useEffect(() => {
+    const updateNotifs = () => {
+        const notifs = mockService.getAppNotifications(user.id);
+        setNotifCount(notifs.filter(n => !n.isRead).length);
+    };
+    updateNotifs();
+    const interval = setInterval(updateNotifs, 5000);
+    return () => clearInterval(interval);
+  }, [user.id]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(event.target as Node)) setShowNotifDropdown(false);
+      if (mobileNavRef.current && !mobileNavRef.current.contains(event.target as Node)) setIsMobileNavOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const isPartner = user.role === UserRole.WHOLESALER || user.role === UserRole.FARMER;
 
   return (
     <div className="flex min-h-screen bg-gray-50">
-      {/* DESKTOP SIDEBAR */}
       <aside className="hidden md:flex flex-col w-64 bg-white border-r border-gray-200 fixed inset-y-0 z-30">
         <div className="p-6 border-b border-gray-100 flex items-center gap-3">
           <div className="w-8 h-8 bg-[#043003] rounded-lg flex items-center justify-center text-white font-bold text-lg">P</div>
           <span className="font-bold text-xl tracking-tight text-gray-900">Platform Zero</span>
         </div>
         <div className="flex-1 overflow-y-auto no-scrollbar">
-            <NavItems />
+            <NavItems user={user} isActive={isActive} setIsMobileNavOpen={setIsMobileNavOpen} isMarketplaceMenuOpen={isMarketplaceMenuOpen} setIsMarketplaceMenuOpen={setIsMarketplaceMenuOpen} submittedQuotesCount={submittedQuotesCount} directory={directory} isChatActive={isChatActive} onLogout={onLogout} />
         </div>
         <div className="p-4 border-t border-gray-200">
           <button onClick={onLogout} className="w-full flex items-center gap-2 px-2 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm font-bold"><LogOut size={18} /><span>Sign Out</span></button>
         </div>
       </aside>
 
-      {/* MOBILE HEADER */}
       <header className="md:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-100 z-40 flex items-center justify-between px-4">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-[#043003] rounded-lg flex items-center justify-center text-white font-bold text-lg">P</div>
@@ -513,38 +446,26 @@ const AppLayout = ({ children, user, onLogout }: any) => {
           </div>
           <div className="flex items-center gap-2">
               <div className="relative" ref={notifRef}>
-                <button 
-                    onClick={() => setShowNotifDropdown(!showNotifDropdown)}
-                    className="p-2 text-gray-500 relative"
-                >
+                <button onClick={() => setShowNotifDropdown(!showNotifDropdown)} className="p-2 text-gray-500 relative">
                     <Bell size={22} />
                     {notifCount > 0 && <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>}
                 </button>
                 {showNotifDropdown && <NotificationDropdown user={user} onClose={() => setShowNotifDropdown(false)} />}
               </div>
-              <button 
-                onClick={() => setIsMobileNavOpen(true)}
-                className="p-2 text-gray-900 bg-gray-50 rounded-xl"
-              >
-                  <HamburgerIcon size={24}/>
-              </button>
+              <button onClick={() => setIsMobileNavOpen(true)} className="p-2 text-gray-900 bg-gray-50 rounded-xl"><HamburgerIcon size={24}/></button>
           </div>
       </header>
 
-      {/* MOBILE NAV DRAWER */}
       {isMobileNavOpen && (
           <div className="fixed inset-0 z-50 md:hidden animate-in fade-in duration-300">
               <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setIsMobileNavOpen(false)} />
-              <div 
-                ref={mobileNavRef}
-                className="absolute top-0 right-0 bottom-0 w-4/5 max-w-sm bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-300 border-l border-gray-100"
-              >
+              <div ref={mobileNavRef} className="absolute top-0 right-0 bottom-0 w-4/5 max-w-sm bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-300 border-l border-gray-100">
                   <div className="p-6 border-b border-gray-100 flex items-center justify-between">
                       <h2 className="font-black text-gray-900 uppercase text-xs tracking-widest">Navigation</h2>
                       <button onClick={() => setIsMobileNavOpen(false)} className="p-2 bg-gray-50 rounded-full text-gray-400"><X size={20}/></button>
                   </div>
                   <div className="flex-1 overflow-y-auto no-scrollbar">
-                      <NavItems />
+                      <NavItems user={user} isActive={isActive} setIsMobileNavOpen={setIsMobileNavOpen} isMarketplaceMenuOpen={isMarketplaceMenuOpen} setIsMarketplaceMenuOpen={setIsMarketplaceMenuOpen} submittedQuotesCount={submittedQuotesCount} directory={directory} isChatActive={isChatActive} onLogout={onLogout} />
                   </div>
               </div>
           </div>
@@ -554,44 +475,21 @@ const AppLayout = ({ children, user, onLogout }: any) => {
         <div className="hidden md:flex justify-end mb-6 sticky top-0 md:absolute md:top-8 md:right-8 z-40 bg-gray-50/80 md:bg-transparent backdrop-blur-sm md:backdrop-blur-0 py-2 md:py-0 -mx-4 md:mx-0 px-4 md:px-0">
             <div className="flex items-center gap-3">
                 <div className="relative" ref={notifRef}>
-                    <button 
-                        onClick={() => setShowNotifDropdown(!showNotifDropdown)}
-                        className={`p-2.5 rounded-full transition-all shadow-sm border ${showNotifDropdown ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
-                    >
+                    <button onClick={() => setShowNotifDropdown(!showNotifDropdown)} className={`p-2.5 rounded-full transition-all shadow-sm border ${showNotifDropdown ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}>
                         <Bell size={18} className={notifCount > 0 ? "animate-swing" : ""}/>
-                        {notifCount > 0 && (
-                            <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[8px] font-black rounded-full border-2 border-white flex items-center justify-center">
-                                {notifCount}
-                            </span>
-                        )}
+                        {notifCount > 0 && (<span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[8px] font-black rounded-full border-2 border-white flex items-center justify-center">{notifCount}</span>)}
                     </button>
                     {showNotifDropdown && <NotificationDropdown user={user} onClose={() => setShowNotifDropdown(false)} />}
                 </div>
-
                 {isPartner && (
-                    <Link 
-                        to="/trading-insights"
-                        className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all shadow-sm border ${
-                            isActive('/trading-insights')
-                            ? 'bg-slate-900 text-white border-slate-900 shadow-md'
-                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                        }`}
-                    >
-                        <BarChart4 size={14} className={isActive('/trading-insights') ? 'text-emerald-400' : 'text-slate-400'}/>
-                        Market Intelligence
-                        {isActive('/trading-insights') && <Sparkles size={12} className="text-emerald-400 animate-pulse"/>}
+                    <Link to="/trading-insights" className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all shadow-sm border ${isActive('/trading-insights') ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}>
+                        <BarChart4 size={14} className={isActive('/trading-insights') ? 'text-emerald-400' : 'text-slate-400'}/>Market Intelligence
                     </Link>
                 )}
             </div>
         </div>
-
-        <div className={isPartner ? "md:mt-12" : ""}>
-            {children}
-        </div>
-        
-        {isPartner && showDailyPopup && (
-            <NetworkSignalsWidget user={user} mode="popup" onFinish={handleClosePopup} />
-        )}
+        <div className={isPartner ? "md:mt-12" : ""}>{children}</div>
+        {isPartner && showDailyPopup && <NetworkSignalsWidget user={user} mode="popup" onFinish={() => setShowDailyPopup(false)} />}
       </main>
     </div>
   );
@@ -619,9 +517,8 @@ const App = () => {
 
   const selectPortal = (type: 'PARTNER' | 'MARKETPLACE' | 'ADMIN') => {
       setPortalType(type);
-      if (type === 'PARTNER') {
-          setLoginStep('role_select');
-      } else {
+      if (type === 'PARTNER') setLoginStep('role_select');
+      else {
           setLoginStep('form');
           if (type === 'ADMIN') setEmail('admin@pz.com');
           else setEmail('alice@cafe.com');
@@ -635,13 +532,6 @@ const App = () => {
       else setEmail('bob@greenvalley.com');
   };
 
-  const resetModal = () => {
-      setShowLoginModal(false);
-      setLoginStep('select');
-      setEmail('');
-      setSubRole(null);
-  };
-
   return (
     <Router>
       {!user ? (
@@ -650,108 +540,48 @@ const App = () => {
             {showLoginModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
                     <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden">
-                        
                         {loginStep === 'select' ? (
                             <>
                                 <div className="p-6 border-b border-gray-100 flex justify-between items-center">
                                     <h2 className="text-2xl font-bold text-gray-900">Welcome Back</h2>
-                                    <button onClick={resetModal} className="text-gray-400 hover:text-gray-600"><X size={24}/></button>
+                                    <button onClick={() => setShowLoginModal(false)} className="text-gray-400 hover:text-gray-600"><X size={24}/></button>
                                 </div>
-                                <div className="p-6 space-y-4 bg-white">
-                                    <p className="text-gray-500 text-sm font-medium mb-2">Please select your portal to continue.</p>
-                                    
-                                    <button 
-                                        onClick={() => selectPortal('PARTNER')}
-                                        className="w-full text-left p-5 border border-gray-200 rounded-xl hover:border-emerald-500 hover:bg-emerald-50/30 transition-all group flex items-center gap-4"
-                                    >
-                                        <div className="w-14 h-14 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 group-hover:scale-105 transition-transform">
-                                            <Briefcase size={28} />
-                                        </div>
-                                        <div className="flex-1">
-                                            <h3 className="font-bold text-gray-900 text-lg">Partners</h3>
-                                            <p className="text-sm text-gray-500">Wholesalers & Farmers</p>
-                                        </div>
-                                        <ChevronRight size={20} className="text-gray-300 group-hover:text-emerald-500 transition-colors" />
+                                <div className="p-6 space-y-4">
+                                    <button onClick={() => selectPortal('PARTNER')} className="w-full text-left p-5 border border-gray-200 rounded-xl hover:border-emerald-500 hover:bg-emerald-50/30 transition-all group flex items-center gap-4">
+                                        <div className="w-14 h-14 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600 group-hover:scale-105 transition-transform"><Briefcase size={28} /></div>
+                                        <div className="flex-1"><h3 className="font-bold text-gray-900 text-lg">Partners</h3><p className="text-sm text-gray-500">Wholesalers & Farmers</p></div>
+                                        <ChevronRight size={20} className="text-gray-300" />
                                     </button>
-
-                                    <button 
-                                        onClick={() => selectPortal('MARKETPLACE')}
-                                        className="w-full text-left p-5 border border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50/30 transition-all group flex items-center gap-4"
-                                    >
-                                        <div className="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 group-hover:scale-105 transition-transform">
-                                            <ShoppingCart size={28} />
-                                        </div>
-                                        <div className="flex-1">
-                                            <h3 className="font-bold text-gray-900 text-lg">Marketplace</h3>
-                                            <p className="text-sm text-gray-500">Buyers & Consumers</p>
-                                        </div>
-                                        <ChevronRight size={20} className="text-gray-300 group-hover:text-blue-500 transition-colors" />
+                                    <button onClick={() => selectPortal('MARKETPLACE')} className="w-full text-left p-5 border border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50/30 transition-all group flex items-center gap-4">
+                                        <div className="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 group-hover:scale-105 transition-transform"><ShoppingCart size={28} /></div>
+                                        <div className="flex-1"><h3 className="font-bold text-gray-900 text-lg">Marketplace</h3><p className="text-sm text-gray-500">Buyers & Consumers</p></div>
+                                        <ChevronRight size={20} className="text-gray-300" />
                                     </button>
                                 </div>
                                 <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-center">
-                                    <button 
-                                        onClick={() => selectPortal('ADMIN')}
-                                        className="text-xs font-bold text-gray-400 hover:text-gray-600 flex items-center gap-2 uppercase tracking-widest py-2 transition-colors"
-                                    >
-                                        <Lock size={14} /> Admin & Staff Access
-                                    </button>
+                                    <button onClick={() => selectPortal('ADMIN')} className="text-xs font-bold text-gray-400 hover:text-gray-600 flex items-center gap-2 uppercase tracking-widest py-2 transition-colors"><Lock size={14} /> Admin Access</button>
                                 </div>
                             </>
                         ) : loginStep === 'role_select' ? (
                             <>
-                                <div className="p-6 border-b border-gray-100 flex items-center gap-4">
-                                    <button onClick={() => setLoginStep('select')} className="text-gray-400 hover:text-gray-600"><ArrowLeft size={20}/></button>
-                                    <h2 className="text-xl font-bold text-gray-900">Partner Login</h2>
-                                </div>
+                                <div className="p-6 border-b border-gray-100 flex items-center gap-4"><button onClick={() => setLoginStep('select')} className="text-gray-400 hover:text-gray-600"><ArrowLeft size={20}/></button><h2 className="text-xl font-bold text-gray-900">Partner Login</h2></div>
                                 <div className="p-6 space-y-4">
-                                    <button 
-                                        onClick={() => selectSubRole('WHOLESALER')}
-                                        className="w-full text-left p-5 border border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all group flex items-center gap-4"
-                                    >
-                                        <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600">
-                                            <Building size={24} />
-                                        </div>
-                                        <div className="flex-1">
-                                            <h3 className="font-bold text-gray-900">Wholesaler Portal</h3>
-                                            <p className="text-xs text-gray-500">Manage inventory & staff</p>
-                                        </div>
+                                    <button onClick={() => selectSubRole('WHOLESALER')} className="w-full text-left p-5 border border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all group flex items-center gap-4">
+                                        <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600"><Building size={24} /></div>
+                                        <div className="flex-1"><h3 className="font-bold text-gray-900">Wholesaler Portal</h3><p className="text-xs text-gray-500">Manage inventory & staff</p></div>
                                     </button>
-                                    <button 
-                                        onClick={() => selectSubRole('FARMER')}
-                                        className="w-full text-left p-5 border border-gray-100 rounded-xl hover:border-emerald-500 hover:bg-emerald-50 transition-all group flex items-center gap-4"
-                                    >
-                                        <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600">
-                                            <Sprout size={24} />
-                                        </div>
-                                        <div className="flex-1">
-                                            <h3 className="font-bold text-gray-900">Farmer Portal</h3>
-                                            <p className="text-xs text-gray-500">Manage harvest & direct sales</p>
-                                        </div>
+                                    <button onClick={() => selectSubRole('FARMER')} className="w-full text-left p-5 border border-gray-200 rounded-xl hover:border-emerald-500 hover:bg-emerald-50 transition-all group flex items-center gap-4">
+                                        <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600"><Sprout size={24} /></div>
+                                        <div className="flex-1"><h3 className="font-bold text-gray-900">Farmer Portal</h3><p className="text-xs text-gray-500">Manage harvest & direct sales</p></div>
                                     </button>
                                 </div>
                             </>
                         ) : (
                             <>
-                                <div className="p-6 border-b border-gray-100 flex items-center gap-4">
-                                    <button onClick={() => portalType === 'PARTNER' ? setLoginStep('role_select') : setLoginStep('select')} className="text-gray-400 hover:text-gray-600"><ArrowLeft size={20}/></button>
-                                    <h2 className="text-xl font-bold text-gray-900">Sign in to {subRole ? `${subRole.charAt(0) + subRole.slice(1).toLowerCase()} Portal` : portalType.charAt(0) + portalType.slice(1).toLowerCase()}</h2>
-                                </div>
+                                <div className="p-6 border-b border-gray-100 flex items-center gap-4"><button onClick={() => setLoginStep(portalType === 'PARTNER' ? 'role_select' : 'select')} className="text-gray-400 hover:text-gray-600"><ArrowLeft size={20}/></button><h2 className="text-xl font-bold text-gray-900">Sign in</h2></div>
                                 <form onSubmit={handleLogin} className="p-8 space-y-6">
-                                    <div>
-                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-2 tracking-wider">Email Address</label>
-                                        <input 
-                                            type="email" 
-                                            autoFocus
-                                            value={email} 
-                                            onChange={e => setEmail(e.target.value)} 
-                                            className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-gray-50 text-lg text-black" 
-                                            placeholder="your@email.com"
-                                        />
-                                    </div>
+                                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-2">Email Address</label><input type="email" autoFocus value={email} onChange={e => setEmail(e.target.value)} className="w-full p-4 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 bg-gray-50 text-black" placeholder="your@email.com"/></div>
                                     <button type="submit" className="w-full py-4 bg-[#043003] text-white rounded-xl font-bold text-lg shadow-lg hover:bg-[#064004] transition-all">Continue</button>
-                                    <p className="text-xs text-center text-gray-400 italic">
-                                        Demo accounts are pre-filled based on your selection.
-                                    </p>
                                 </form>
                             </>
                         )}
@@ -762,14 +592,7 @@ const App = () => {
       ) : (
         <AppLayout user={user} onLogout={() => setUser(null)}>
             <Routes>
-                <Route path="/" element={
-                  user.role === UserRole.ADMIN ? <AdminDashboard /> : 
-                  user.role === UserRole.CONSUMER ? <ConsumerDashboard user={user} /> :
-                  user.role === UserRole.DRIVER ? <DriverDashboard user={user} /> :
-                  user.role === UserRole.PZ_REP ? <RepDashboard user={user} /> :
-                  user.role === UserRole.FARMER ? <FarmerDashboard user={user} /> :
-                  user.dashboardVersion === 'v1' ? <SellerDashboardV1 user={user} /> : <Dashboard user={user} />
-                } />
+                <Route path="/" element={user.role === UserRole.ADMIN ? <AdminDashboard /> : user.role === UserRole.CONSUMER ? <ConsumerDashboard user={user} /> : user.role === UserRole.DRIVER ? <DriverDashboard user={user} /> : user.role === UserRole.PZ_REP ? <RepDashboard user={user} /> : user.role === UserRole.FARMER ? <FarmerDashboard user={user} /> : user.dashboardVersion === 'v1' ? <SellerDashboardV1 user={user} /> : <Dashboard user={user} />} />
                 <Route path="/marketplace" element={<Marketplace user={user} />} />
                 <Route path="/login-requests" element={<LoginRequests />} />
                 <Route path="/pricing-requests" element={<PricingRequests user={user} />} />
@@ -786,6 +609,7 @@ const App = () => {
                 <Route path="/accounts" element={<Accounts user={user} />} />
                 <Route path="/orders" element={<CustomerOrders user={user} />} />
                 <Route path="/contacts" element={<Contacts user={user} />} />
+                <Route path="/blueprint" element={<Blueprint />} />
                 <Route path="/settings" element={<SettingsComponent user={user} onRefreshUser={() => setUser({...user})} />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

@@ -3,7 +3,7 @@ import {
   User, UserRole, Product, InventoryItem, Order, Customer, 
   RegistrationRequest, Driver, Packer, Lead, SupplierPriceRequest,
   PricingRule, OnboardingFormTemplate, BusinessProfile,
-  SupplierPriceRequestItem, AppNotification, ChatMessage
+  SupplierPriceRequestItem, AppNotification, ChatMessage, BusinessCategory
 } from '../types';
 
 export const USERS: User[] = [
@@ -15,6 +15,11 @@ export const USERS: User[] = [
   { id: 'rep1', name: 'Rep User', businessName: 'Platform Zero', role: UserRole.PZ_REP, email: 'rep1@pz.com', commissionRate: 5.0 },
   { id: 'd1', name: 'Dave Driver', businessName: 'Fresh Wholesalers', role: UserRole.DRIVER, email: 'dave@fresh.com' }
 ];
+
+export interface SegmentConfig {
+    targetSavings: number;
+    supplierTarget: number;
+}
 
 class MockDataService {
   private users: User[] = [...USERS];
@@ -42,7 +47,7 @@ class MockDataService {
     }
   ];
   private customers: Customer[] = [
-      { id: 'c1', businessName: 'Fresh Market Co', contactName: 'Sarah Johnson', email: 'orders@freshmarket.com', phone: '0400 123 456', category: 'Retail', connectionStatus: 'Active', connectedSupplierName: 'Fresh Wholesalers', connectedSupplierId: 'u2', connectedSupplierRole: 'Wholesaler', pricingStatus: 'Approved', joinedDate: '2023-01-15', pzMarkup: 15 },
+      { id: 'c1', businessName: 'Fresh Market Co', contactName: 'Sarah Johnson', email: 'orders@freshmarket.com', phone: '0400 123 456', category: 'Retailer', connectionStatus: 'Active', connectedSupplierName: 'Fresh Wholesalers', connectedSupplierId: 'u2', connectedSupplierRole: 'Wholesaler', pricingStatus: 'Approved', joinedDate: '2023-01-15', pzMarkup: 15 },
       { id: 'c2', businessName: 'Healthy Eats Restaurant', contactName: 'Chef Mario', email: 'mario@healthyeats.com', phone: '0400 333 444', category: 'Restaurant', connectionStatus: 'Active', connectedSupplierName: 'Fresh Wholesalers', connectedSupplierId: 'u2', connectedSupplierRole: 'Wholesaler', pricingStatus: 'Approved', joinedDate: '2023-02-10', pzMarkup: 12 }
   ];
   private leads: Lead[] = [
@@ -82,6 +87,16 @@ class MockDataService {
       'FARMER': { role: UserRole.FARMER, sections: [] }
   };
 
+  private segmentConfigs: Record<BusinessCategory, SegmentConfig> = {
+    'Pub': { targetSavings: 35, supplierTarget: 40 },
+    'Deli': { targetSavings: 20, supplierTarget: 25 },
+    'Cafe': { targetSavings: 25, supplierTarget: 30 },
+    'Restaurant': { targetSavings: 25, supplierTarget: 30 },
+    'Sporting club': { targetSavings: 30, supplierTarget: 35 },
+    'Catering': { targetSavings: 22, supplierTarget: 28 },
+    'Grocery store': { targetSavings: 15, supplierTarget: 20 }
+  };
+
   constructor() {
       try {
           const storedRequests = localStorage.getItem('pz_registrationRequests');
@@ -108,12 +123,14 @@ class MockDataService {
           const storedMessages = localStorage.getItem('pz_chat_messages');
           if (storedMessages) this.messages = JSON.parse(storedMessages);
 
-          // Fix property errors by adding persistence for missing fields
           const storedPricingRules = localStorage.getItem('pz_pricingRules');
           if (storedPricingRules) this.pricingRules = JSON.parse(storedPricingRules);
 
           const storedFormTemplates = localStorage.getItem('pz_formTemplates');
           if (storedFormTemplates) this.formTemplates = JSON.parse(storedFormTemplates);
+
+          const storedSegmentConfigs = localStorage.getItem('pz_segmentConfigs');
+          if (storedSegmentConfigs) this.segmentConfigs = JSON.parse(storedSegmentConfigs);
 
           // Seed initial admin notification if empty
           if (this.notifications.length === 0) {
@@ -134,12 +151,22 @@ class MockDataService {
         localStorage.setItem('pz_notifications', JSON.stringify(this.notifications));
         localStorage.setItem('pz_supplierPriceRequests', JSON.stringify(this.supplierPriceRequests));
         localStorage.setItem('pz_chat_messages', JSON.stringify(this.messages));
-        // Added persistence for pricing rules and form templates
         localStorage.setItem('pz_pricingRules', JSON.stringify(this.pricingRules));
         localStorage.setItem('pz_formTemplates', JSON.stringify(this.formTemplates));
+        localStorage.setItem('pz_segmentConfigs', JSON.stringify(this.segmentConfigs));
     } catch (e) {
         console.error("Failed to persist mock data", e);
     }
+  }
+
+  // Segment Management
+  getMarketSegmentConfigs(): Record<BusinessCategory, SegmentConfig> {
+      return this.segmentConfigs;
+  }
+
+  updateMarketSegmentConfig(category: BusinessCategory, config: SegmentConfig) {
+      this.segmentConfigs[category] = config;
+      this.persistData();
   }
 
   // --- CHAT SYSTEM ---
@@ -634,7 +661,7 @@ class MockDataService {
                 businessName: req.businessName,
                 contactName: req.name,
                 email: req.email.toLowerCase(),
-                category: 'Restaurant',
+                category: req.consumerData?.businessCategory || 'Restaurant',
                 connectionStatus: 'Pending Connection',
                 joinedDate: new Date().toISOString()
               });
@@ -717,12 +744,10 @@ class MockDataService {
   }
 
   // --- PRICING RULES ---
-  // Error in file components/ProductPricing.tsx on line 262: Property 'getPricingRules' does not exist on type 'MockDataService'.
   getPricingRules(ownerId: string, productId: string): PricingRule[] {
     return this.pricingRules.filter(r => r.ownerId === ownerId && r.productId === productId);
   }
 
-  // Error in file components/ProductPricing.tsx on line 279: Property 'savePricingRules' does not exist on type 'MockDataService'.
   savePricingRules(rules: PricingRule[]) {
     rules.forEach(newRule => {
       const idx = this.pricingRules.findIndex(r => r.id === newRule.id);
@@ -736,20 +761,16 @@ class MockDataService {
   }
 
   // --- FORM TEMPLATES ---
-  // Error in file components/AdminDashboard.tsx on line 48: Property 'getFormTemplate' does not exist on type 'MockDataService'.
   getFormTemplate(role: UserRole) {
     return this.formTemplates[role];
   }
 
-  // Error in file components/AdminDashboard.tsx on line 125: Property 'updateFormTemplate' does not exist on type 'MockDataService'.
   updateFormTemplate(role: UserRole, template: OnboardingFormTemplate) {
     this.formTemplates[role] = template;
     this.persistData();
   }
 
   // --- ONBOARDING ---
-  // Error in file components/ConsumerOnboarding.tsx on line 124: Property 'sendOnboardingComms' does not exist on type 'MockDataService'.
-  // Error in file components/AdminPriceRequests.tsx on line 54: Property 'sendOnboardingComms' does not exist on type 'MockDataService'.
   sendOnboardingComms(customerId: string) {
     const customer = this.customers.find(c => c.id === customerId);
     if (customer) {
@@ -760,19 +781,15 @@ class MockDataService {
   }
 
   // --- REP DASHBOARD ---
-  // Error in file components/RepDashboard.tsx on line 27: Property 'getRepCustomers' does not exist on type 'MockDataService'.
   getRepCustomers(repId: string) {
     return this.customers.filter(c => c.assignedPzRepId === repId);
   }
 
-  // Error in file components/RepDashboard.tsx on line 31: Property 'getRepIssues' does not exist on type 'MockDataService'.
   getRepIssues(repId: string) {
     const repCustomers = this.getRepCustomers(repId).map(c => c.id);
     return this.orders.filter(o => repCustomers.includes(o.buyerId) && o.issue && o.issue.status === 'Open');
   }
 
-  // Error in file components/RepDashboard.tsx on line 34: Property 'getRepStats' does not exist on type 'MockDataService'.
-  // Error in file components/AdminRepManagement.tsx on line 21: Property 'getRepStats' does not exist on type 'MockDataService'.
   getRepStats(repId: string) {
     const repCustomers = this.getRepCustomers(repId).map(c => c.id);
     const repOrders = this.orders.filter(o => repCustomers.includes(o.buyerId));

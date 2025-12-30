@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Send, ShieldCheck } from 'lucide-react';
 
@@ -116,11 +115,11 @@ export const ChatDialog: React.FC<ChatDialogProps> = ({ isOpen, onClose, orderId
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center pointer-events-none">
+    <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center pointer-events-none">
        {/* Backdrop to darken the existing modal slightly more to focus on chat */}
        <div className="absolute inset-0 bg-black/10 pointer-events-auto" onClick={onClose} />
        
-       <div className="bg-white w-full sm:w-96 h-[500px] sm:rounded-xl shadow-2xl flex flex-col pointer-events-auto relative z-[70] sm:mr-4 mb-0 sm:mb-4 border border-gray-200 overflow-hidden transform transition-all animate-in slide-in-from-bottom-10 fade-in duration-300">
+       <div className="bg-white w-full sm:w-96 h-[500px] sm:rounded-xl shadow-2xl flex flex-col pointer-events-auto relative z-[210] sm:mr-4 mb-0 sm:mb-4 border border-gray-200 overflow-hidden transform transition-all animate-in slide-in-from-bottom-10 fade-in duration-300">
           {/* Header */}
           <div className="bg-slate-900 text-white p-4 flex justify-between items-center shadow-md">
             <div className="flex items-center gap-3">
