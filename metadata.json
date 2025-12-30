@@ -1,0 +1,7 @@
+{
+  "name": "Platform Zero",
+  "description": "A B2B fresh produce marketplace connecting farmers, wholesalers, and consumers to reduce food waste.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
